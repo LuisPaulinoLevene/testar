@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preencher Lacunas no DOCX</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.1/pizzip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.24.2/docxtemplater.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+</head>
+<body>
+    <h1>Preencher Lacunas no Documento</h1>
+    <input type="text" id="docName" placeholder="Nome do documento" required>
+    <label for="campo1">Campo 1:</label>
+    <input type="text" id="campo1" required>
+
+    <label for="campo2">Campo 2:</label>
+    <input type="text" id="campo2" required>
+
+    <button id="downloadBtn">Gerar e Baixar Documento</button>
+
+    <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCidc14fDosW7P17Sld0bAZ70yT8HU9mpI",
+            authDomain: "planos-1a454.firebaseapp.com",
+            projectId: "planos-1a454",
+            storageBucket: "planos-1a454.appspot.com",
+            messagingSenderId: "112602637510",
+            appId: "1:112602637510:web:95e430910971631ed1a3c7",
+            measurementId: "G-FBZS6TZHZK"
+        };
+
+        // Inicializa o Firebase
+        firebase.initializeApp(firebaseConfig);
+        const storage = firebase.storage();
+
+        document.getElementById('downloadBtn').addEventListener('click', async () => {
+            const docName = document.getElementById('docName').value;
+            const campo1 = document.getElementById('campo1').value;
+            const campo2 = document.getElementById('campo2').value;
+
+            try {
+                // Verifique se o caminho está correto
+                const docRef = storage.ref(`planos/${docName}`);
+                const url = await docRef.getDownloadURL();
+
+                // Usar o URL diretamente para manipular o documento
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.responseType = 'blob'; // Defina o tipo de resposta como blob
+
+                xhr.onload = async function() {
+                    if (this.status === 200) {
+                        const blob = this.response;
+
+                        // Manipulação do arquivo DOCX
+                        const newBlob = await preencherLacunas(blob, campo1, campo2);
+                        const newUrl = URL.createObjectURL(newBlob);
+                        const a = document.createElement('a');
+                        a.href = newUrl;
+                        a.download = `${docName}_preenchido.docx`;
+                        a.click();
+                        URL.revokeObjectURL(newUrl);
+                    } else {
+                        console.error("Erro ao carregar o documento:", this.status);
+                    }
+                };
+
+                xhr.onerror = function() {
+                    console.error("Erro na requisição:", xhr.statusText);
+                };
+
+                xhr.send(); // Envie a requisição
+            } catch (error) {
+                console.error("Erro ao buscar ou processar o documento:", error);
+            }
+        });
+
+        async function preencherLacunas(blob, campo1, campo2) {
+            const arrayBuffer = await blob.arrayBuffer();
+            const zip = new PizZip(arrayBuffer);
+            const doc = new window.Docxtemplater(zip, { paragraphLoop: true, lineBreaks: true });
+
+            doc.setData({
+                campo1: campo1,
+                campo2: campo2
+            });
+
+            doc.render();
+            const newBuffer = doc.getZip().generate({ type: "blob" });
+            return newBuffer;
+        }
+    </script>
+</body>
+</html>
